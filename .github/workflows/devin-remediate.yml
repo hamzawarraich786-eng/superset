@@ -104,7 +104,7 @@ jobs:
             -e DRY_RUN=false \
             -e POST_GITHUB_COMMENTS=true \
             -e POLL_INTERVAL_SECONDS=30 \
-            -e MAX_POLL_SECONDS=900 \
+            -e MAX_POLL_SECONDS=1800 \
             -e DEVIN_MAX_ACU_LIMIT=5 \
             -e TARGET_REPO_FULL_NAME=hamzawarraich786-eng/superset \
             -v "$(pwd)/prepared-event/event.json:/github_event/event.json:ro" \
