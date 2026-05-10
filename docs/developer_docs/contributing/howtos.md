@@ -427,6 +427,61 @@ npm ls @babel/parser @babel/traverse glob
 3. Call the function in `processFile()`
 4. Test with `npm run check:custom-rules`
 
+## Narrow validation for small frontend changes
+
+For small, focused maintenance PRs — such as a dependency or lockfile bump, a small
+frontend utility tweak, or a focused frontend test change — prefer running narrow
+validation against only the files you touched instead of the full CI matrix. All
+commands below already exist in the repository (see the [Linting](#linting) and
+[Frontend Testing](#frontend-testing) sections above).
+
+```bash
+cd superset-frontend
+
+# Lint only the changed area (fast). Use lint:full for OXC + custom rules.
+npm run lint
+npm run lint:full
+
+# Auto-fix what can be fixed before pushing.
+npm run lint-fix
+
+# TypeScript check (tsc --noEmit). Useful for any .ts/.tsx edit.
+npm run type
+
+# Prettier check / write.
+npm run prettier-check
+npm run prettier
+
+# Run a single Jest test file, or filter by test name.
+npm run test -- path/to/your.test.tsx
+npm run test -- -t "name of the test"
+```
+
+You can also let `pre-commit` pick the right hooks for just the files you staged:
+
+```bash
+git add <files-you-changed>
+pre-commit run                                       # all hooks, staged files only
+pre-commit run prettier-frontend --files <files>
+pre-commit run oxlint-frontend --files <files>
+pre-commit run type-checking-frontend --files <files>
+```
+
+Suggested narrow checks for common maintenance changes:
+
+- **Dependency or lockfile changes** (`superset-frontend/package.json`,
+  `package-lock.json`): run `npm install` in `superset-frontend/`, then
+  `npm run lint` and `npm run type` to confirm types still resolve. Run any
+  tests that import the affected package via `npm run test -- <file>`.
+- **Small frontend utility changes**: `npm run lint`, `npm run type`, and
+  `npm run test -- <file>` scoped to the utility's test file(s).
+- **Focused frontend test changes**: `npm run test -- <file>` (optionally with
+  `-t "<name>"`), plus `pre-commit run oxlint-frontend --files <files>` to lint
+  just the changed files.
+
+CI still runs the full validation matrix on the PR, so this is for fast local
+iteration rather than a replacement for CI.
+
 ## GitHub Ephemeral Environments
 
 For every PR, an ephemeral environment is automatically deployed for testing.
