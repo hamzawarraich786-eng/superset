@@ -1,0 +1,120 @@
+name: Devin Remediate Issue
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to remediate manually"
+        required: false
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  actions: read
+
+jobs:
+  remediate:
+    name: Run Devin remediator
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'issues' &&
+          github.event.action == 'labeled' &&
+          github.event.label.name == 'devin-remediate'
+        )
+      }}
+
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          path: target-repo
+
+      - name: Checkout remediator
+        uses: actions/checkout@v4
+        with:
+          repository: hamzawarraich786-eng/devin-superset-remediator
+          path: remediator
+
+      - name: Prepare event payload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+        run: |
+          mkdir -p prepared-event
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -z "$ISSUE_NUMBER" ]; then
+              echo "workflow_dispatch requires issue_number."
+              exit 1
+            fi
+
+            gh api "repos/${{ github.repository }}/issues/${ISSUE_NUMBER}" > prepared-event/issue.json
+
+            python - <<'PY'
+          import json
+
+          with open("prepared-event/issue.json", "r", encoding="utf-8") as issue_file:
+              issue = json.load(issue_file)
+
+          event = {
+              "action": "labeled",
+              "label": {"name": "devin-remediate"},
+              "repository": {
+                  "full_name": "${{ github.repository }}",
+                  "name": "${{ github.event.repository.name }}",
+                  "owner": {"login": "${{ github.repository_owner }}"},
+                  "html_url": "https://github.com/${{ github.repository }}",
+                  "clone_url": "https://github.com/${{ github.repository }}.git",
+                  "default_branch": "${{ github.event.repository.default_branch }}",
+              },
+              "issue": issue,
+              "sender": {"login": "${{ github.actor }}"},
+          }
+
+          with open("prepared-event/event.json", "w", encoding="utf-8") as event_file:
+              json.dump(event, event_file)
+          PY
+          else
+            cp "$GITHUB_EVENT_PATH" prepared-event/event.json
+          fi
+
+      - name: Build Docker image
+        run: docker build -t devin-superset-remediator ./remediator
+
+      - name: Create reports directory
+        run: mkdir -p reports
+
+      - name: Run remediator
+        env:
+          DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
+          DEVIN_ORG_ID: ${{ secrets.DEVIN_ORG_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          docker run --rm \
+            -e DEVIN_API_KEY \
+            -e DEVIN_ORG_ID \
+            -e GITHUB_TOKEN \
+            -e GITHUB_EVENT_PATH=/github_event/event.json \
+            -e DRY_RUN=false \
+            -e POST_GITHUB_COMMENTS=true \
+            -e POLL_INTERVAL_SECONDS=30 \
+            -e MAX_POLL_SECONDS=900 \
+            -e DEVIN_MAX_ACU_LIMIT=5 \
+            -e TARGET_REPO_FULL_NAME=hamzawarraich786-eng/superset \
+            -v "$(pwd)/prepared-event/event.json:/github_event/event.json:ro" \
+            -v "$(pwd)/reports:/app/reports" \
+            devin-superset-remediator
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: devin-remediation-reports
+          path: reports/
+          if-no-files-found: warn
