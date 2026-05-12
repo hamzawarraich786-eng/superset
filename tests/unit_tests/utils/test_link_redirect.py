@@ -67,6 +67,25 @@ def test_no_double_redirect(app: Flask) -> None:
     assert result.count("/redirect/") == 1
 
 
+def test_external_link_with_redirect_path_is_rewritten(app: Flask) -> None:
+    """External URLs that happen to contain ``/redirect/`` must still be wrapped."""
+    html = '<a href="https://evil.com/redirect/phish">Click</a>'
+    result = process_html_links(html)
+    assert (
+        "superset.example.com/redirect/?url=https%3A%2F%2Fevil.com%2Fredirect%2Fphish"
+    ) in result
+    # The raw external URL must not appear unwrapped in the href.
+    assert 'href="https://evil.com/redirect/phish"' not in result
+
+
+def test_external_link_with_redirect_in_query_is_rewritten(app: Flask) -> None:
+    """External URLs with ``/redirect/`` only in the query string are wrapped."""
+    html = '<a href="https://evil.com/page?next=/redirect/x">Click</a>'
+    result = process_html_links(html)
+    assert "superset.example.com/redirect/?url=" in result
+    assert 'href="https://evil.com/page?next=/redirect/x"' not in result
+
+
 def test_multiple_links(app: Flask) -> None:
     html = (
         '<a href="https://evil.com">Bad</a>'
