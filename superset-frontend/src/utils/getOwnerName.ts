@@ -22,5 +22,15 @@ export default function getOwnerName(owner?: Owner): string {
   if (!owner) {
     return '';
   }
-  return owner.full_name || `${owner.first_name} ${owner.last_name}`;
+  if (owner.full_name?.trim()) {
+    return owner.full_name.trim();
+  }
+  const composed = [owner.first_name, owner.last_name]
+    .filter((part): part is string => Boolean(part?.trim()))
+    .map(part => part.trim())
+    .join(' ');
+  if (composed) {
+    return composed;
+  }
+  return owner.email?.trim() ?? '';
 }

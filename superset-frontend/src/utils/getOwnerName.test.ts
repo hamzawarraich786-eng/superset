@@ -29,3 +29,44 @@ test('render owner name correctly', () => {
 test('return empty string for undefined owner', () => {
   expect(getOwnerName(undefined)).toEqual('');
 });
+
+test('prefer full_name when both full_name and first/last are present', () => {
+  expect(
+    getOwnerName({
+      id: 1,
+      full_name: 'Jane Doe',
+      first_name: 'Janet',
+      last_name: 'Doer',
+    }),
+  ).toEqual('Jane Doe');
+});
+
+test('handle partial first/last names without rendering undefined', () => {
+  expect(getOwnerName({ id: 1, first_name: 'Foo' })).toEqual('Foo');
+  expect(getOwnerName({ id: 2, last_name: 'Bar' })).toEqual('Bar');
+});
+
+test('trim extra whitespace in name fields', () => {
+  expect(
+    getOwnerName({ id: 1, first_name: '  Foo  ', last_name: '  Bar  ' }),
+  ).toEqual('Foo Bar');
+  expect(getOwnerName({ id: 2, full_name: '  John Doe  ' })).toEqual(
+    'John Doe',
+  );
+});
+
+test('fallback to email when no name fields are present', () => {
+  expect(getOwnerName({ id: 1, email: 'foo@example.com' })).toEqual(
+    'foo@example.com',
+  );
+});
+
+test('return empty string when owner has no usable identifying fields', () => {
+  expect(getOwnerName({ id: 1 })).toEqual('');
+  expect(
+    getOwnerName({ id: 2, first_name: '', last_name: '', full_name: '' }),
+  ).toEqual('');
+  expect(
+    getOwnerName({ id: 3, first_name: '  ', last_name: '  ', email: '  ' }),
+  ).toEqual('');
+});
