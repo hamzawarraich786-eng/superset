@@ -37,4 +37,20 @@ describe('parseCookie', () => {
   test('accepts an arg', () => {
     expect(parseCookie('val=foo')).toEqual({ val: 'foo' });
   });
+
+  test('preserves equals signs within cookie values', () => {
+    expect(parseCookie('token=abc==; other=plain')).toEqual({
+      token: 'abc==',
+      other: 'plain',
+    });
+    expect(parseCookie('jwt=header.payload=.signature==')).toEqual({
+      jwt: 'header.payload=.signature==',
+    });
+  });
+
+  test('handles pairs separated by ";" with or without a following space', () => {
+    expect(parseCookie('a=1;b=2')).toEqual({ a: '1', b: '2' });
+    expect(parseCookie('a=1; b=2')).toEqual({ a: '1', b: '2' });
+    expect(parseCookie('a=1;  b=2')).toEqual({ a: '1', b: '2' });
+  });
 });

@@ -22,8 +22,11 @@ type CookieMap = { [cookieId: string]: string };
 export default function parseCookie(cookie = document.cookie): CookieMap {
   return Object.fromEntries(
     cookie
-      .split('; ')
+      .split(/;\s*/)
       .filter(x => x)
-      .map(x => x.split('=')),
+      .map(pair => {
+        const eq = pair.indexOf('=');
+        return eq === -1 ? [pair, ''] : [pair.slice(0, eq), pair.slice(eq + 1)];
+      }),
   );
 }
