@@ -67,6 +67,21 @@ def _is_external(href: str, base_hosts: set[str]) -> bool:
     return bool(parsed.netloc) and parsed.netloc.lower() not in base_hosts
 
 
+def _is_wrapped_redirect(href: str, base_hosts: set[str]) -> bool:
+    """Return True if *href* is an already-wrapped Superset redirect URL.
+
+    A wrapped redirect URL points at an internal Superset host and has a
+    path beginning with ``/redirect/``. External URLs that happen to
+    contain ``/redirect/`` elsewhere in the path are not considered wrapped.
+    """
+    parsed = urlparse(href)
+    if parsed.scheme not in ("http", "https"):
+        return False
+    if not parsed.netloc or parsed.netloc.lower() not in base_hosts:
+        return False
+    return parsed.path == "/redirect" or parsed.path.startswith("/redirect/")
+
+
 def _replace_href(
     match: re.Match[str],
     base_hosts: set[str],
@@ -76,8 +91,8 @@ def _replace_href(
     prefix, quote_char, href = match.group(1), match.group(2), match.group(3)
     href = href.strip()
 
-    # Don't double-redirect
-    if "/redirect/" in href:
+    # Don't double-wrap links that already point at our own /redirect/ endpoint
+    if _is_wrapped_redirect(href, base_hosts):
         return match.group(0)
 
     if not _is_external(href, base_hosts):
